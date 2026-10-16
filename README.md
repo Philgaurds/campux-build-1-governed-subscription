@@ -4,9 +4,9 @@
 A governed Azure environment for Campux Retail with a management group, prod and nonprod environments, role-based access, two enforced policies and a managed identity.
 
 ## Naming convention
-- Management group: store name, Campux-retail
-- Subscription: first build for the store , Campux-build
-- Resource groups: subscription-environment(prod or nonprod)-rg, e.g. campux-build-nonprod-rg
+- Management group: the client's name, `Campux-retail`
+- Subscription: one per build, `Campux-build`
+- Resource groups: `<subscription>-<environment>-rg`, e.g. `campux-build-nonprod-rg`
 
 ## Hierarchy
 ![Hierarchy](build-1-evidence/r1-hierarchy-evidence.png)
@@ -17,11 +17,11 @@ I used 2 resource groups instead of 2 subscriptions because of the plan I curren
 ## RBAC model
 | Principal | Role | Scope | Why |
 |---|---|---|---|
-| Jack Ava | Owner | Management group, Subscription, Resource group | Owner is held by me |
-| Phil | Reader | prod-rg | So that he won't be able to make any changes that would affect the store front |
-| Phil | Contributor | nonprod-rg | So he can work efficiently in a test environment without affecting the main store front |
+| Jack Ava | Owner | Management group, Subscription, Resource group | I am the only Owner so nobody else holds Owner at any scope |
+| Phil | Reader | campux-build-prod-rg | So that he won't be able to make any changes that would affect the store front |
+| Phil | Contributor | campux-build-nonprod-rg | So he can work efficiently in a test environment without affecting the main store front |
 
-Phil's Contributor stops at nonprod's scope, which is what keeps him out of prod
+Phil's Contributor stops at nonprod's scope, which is what keeps him out of prod.
 
 ![Role assignments for prod-rg](build-1-evidence/r3-rbac-prod-evidence.png)
 
@@ -37,13 +37,14 @@ It sits at the management group level so it is inherited down the estate so a ne
 Tried creating a resource in "Central US" when there's only an allowed region of "East US"
 
 ### Required tags (Deny)
+Tag values on the compliant resource group
 | Tags | Value |
 |---|---|
 | owner |store-team |
 | env | test |
 | cost-center | training |
 
-The policy applies to resource groups, requires owner, env and cost-center, and uses the Deny effect. This ensures that every resource has an owner that can be billed. Assigned at the subscription so every resource group created under it must carry the tags
+The policy applies to resource groups, requires owner, env and cost-center, and uses the Deny effect. This ensures that every resource has an owner that can be billed. Assigned at the subscription so every resource group created under it must carry the tags. Assigned at the subscription because the tags are specific to this build’s cost tracking.
 
 ![A resource group compliant to the tag policy](build-1-evidence/r5-compliant-resource-group-evidence.png)
 
@@ -52,14 +53,19 @@ The policy applies to resource groups, requires owner, env and cost-center, and 
 ![Tag policy error details](build-1-evidence/r5-tag-deny-2.png)
 
 ## Managed identity
-A user-assigned managed identity, Segs-campux-build-nonprod, lives in the nonprod resource group. It holds one role, "Storage Blob Data Reader", scoped to "campux-build-nonprod-rg", so it can do only that one job which is to only read blob data.
+A user-assigned managed identity, Segs-campux-build-nonprod, lives in the nonprod resource group. It holds one role, "Storage Blob Data Reader", scoped to "campux-build-nonprod-rg", so it can do only that one job which is to only read blob data. I scoped it to the resource group because no storage account exists yet. In a real estate I would narrow it to the specific account.
 
 There is no service principal or client secret anywhere in this estate. Azure issues and rotates a managed identity's credentials itself, so there is no secret to store, leak or rotate. 
 
-![Managed identity with it's role assignment at a nonprod resource group](build-1-evidence/r6-managed-identity-evidence.png)
+![Managed identity with its role assignment at a nonprod resource group](build-1-evidence/r6-managed-identity-evidence.png)
 
 ## Requesting access
 As a new hire:
-- Message the Owner, Jack Ava, with who needs access, which environment, which role, and why.
+- Email the Owner, avajackones@gmail.com, with who needs access, which environment, which role, and why.
 - The Owner checks the request against least privilege: Contributor only on nonprod, Reader on prod, Owner never.
-- The Owner grants the role at resource-group scope under Access control (IAM) and confirms
+- The Owner grants the role at resource-group scope under Access control (IAM) and confirms.
+
+## Deliberate mistake tests
+I tried to break my own rules and recorded what stopped me:
+- **Wrong region:** I tried to create a resource in Central US, and the allowed-locations policy denied it (see the R4 screenshots).
+- **Untagged resource group:** I tried to create one without the required tags, and the tag policy denied it (see the R5 screenshots)
